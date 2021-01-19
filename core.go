@@ -2,6 +2,7 @@ package zapsentry
 
 import (
 	"errors"
+	"runtime"
 	"time"
 
 	"github.com/getsentry/sentry-go"
@@ -64,6 +65,7 @@ func (c *core) Write(ent zapcore.Entry, fs []zapcore.Field) error {
 
 	if !c.cfg.DisableStacktrace {
 		trace := sentry.NewStacktrace()
+		trace.Frames = trace.Frames[4:]
 		if trace != nil {
 			event.Exception = []sentry.Exception{{
 				Type:       ent.Message,
@@ -81,6 +83,24 @@ func (c *core) Write(ent zapcore.Entry, fs []zapcore.Field) error {
 	c.client.CaptureEvent(event, nil, hub.Scope())
 
 	return nil
+}
+
+func newStacktrace() *sentry.Stacktrace {
+	pcs := make([]uintptr, 100)
+	n := runtime.Callers(1, pcs)
+
+	if n == 0 {
+		return nil
+	}
+
+	frames := extractFrames(pcs[:n])
+	frames = filterFrames(frames)
+
+	stacktrace := Stacktrace{
+		Frames: frames,
+	}
+
+	return &stacktrace
 }
 
 func (c *core) Sync() error {
