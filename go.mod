@@ -1,6 +1,6 @@
 module github.com/themakers/zapsentry
 
-go 1.12
+go 1.15
 
 require (
 	github.com/CloudyKit/jet v2.1.3-0.20180809161101-62edd43e4f88+incompatible // indirect

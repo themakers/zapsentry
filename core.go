@@ -28,6 +28,18 @@ func NewCore(cfg Configuration, factory SentryClientFactory) (zapcore.Core, erro
 	return &core, nil
 }
 
+var _ zapcore.Core = (*core)(nil)
+
+type core struct {
+	client *sentry.Client
+	cfg    *Configuration
+	zapcore.LevelEnabler
+	flushTimeout time.Duration
+
+	fields map[string]interface{}
+}
+
+
 func (c *core) With(fs []zapcore.Field) zapcore.Core {
 	return c.with(fs)
 }
@@ -112,13 +124,4 @@ type ClientGetter interface {
 
 func (c *core) GetClient() *sentry.Client {
 	return c.client
-}
-
-type core struct {
-	client *sentry.Client
-	cfg    *Configuration
-	zapcore.LevelEnabler
-	flushTimeout time.Duration
-
-	fields map[string]interface{}
 }
