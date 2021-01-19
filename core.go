@@ -1,28 +1,30 @@
 package zapsentry
 
 import (
+	"errors"
 	"time"
 
 	"github.com/getsentry/sentry-go"
 	"go.uber.org/zap/zapcore"
 )
 
-func NewCore(cfg Configuration, factory SentryClientFactory) (zapcore.Core, error) {
+var ErrFlushTimedOut = errors.New("flush timed out")
+
+func NewCore(cfg Config, factory SentryClientFactory) (zapcore.Core, error) {
 	client, err := factory()
 	if err != nil {
-		return zapcore.NewNopCore(), err
+		return nil, err
 	}
 
 	core := core{
 		client:       client,
 		cfg:          &cfg,
 		LevelEnabler: cfg.Level,
-		flushTimeout: 5 * time.Second,
 		fields:       make(map[string]interface{}),
 	}
 
-	if cfg.FlushTimeout > 0 {
-		core.flushTimeout = cfg.FlushTimeout
+	if core.cfg.FlushTimeout <= 0 {
+		core.cfg.FlushTimeout = 5 * time.Second
 	}
 
 	return &core, nil
@@ -32,13 +34,11 @@ var _ zapcore.Core = (*core)(nil)
 
 type core struct {
 	client *sentry.Client
-	cfg    *Configuration
+	cfg    *Config
 	zapcore.LevelEnabler
-	flushTimeout time.Duration
 
 	fields map[string]interface{}
 }
-
 
 func (c *core) With(fs []zapcore.Field) zapcore.Core {
 	return c.with(fs)
@@ -77,18 +77,18 @@ func (c *core) Write(ent zapcore.Entry, fs []zapcore.Field) error {
 	if hub == nil {
 		hub = sentry.CurrentHub()
 	}
-	_ = c.client.CaptureEvent(event, nil, hub.Scope())
 
-	// We may be crashing the program, so should flush any buffered events.
-	if ent.Level > zapcore.ErrorLevel {
-		c.client.Flush(c.flushTimeout)
-	}
+	c.client.CaptureEvent(event, nil, hub.Scope())
+
 	return nil
 }
 
 func (c *core) Sync() error {
-	c.client.Flush(c.flushTimeout)
-	return nil
+	if !c.client.Flush(c.cfg.FlushTimeout) {
+		return ErrFlushTimedOut
+	} else {
+		return nil
+	}
 }
 
 func (c *core) with(fs []zapcore.Field) *core {
@@ -112,7 +112,6 @@ func (c *core) with(fs []zapcore.Field) *core {
 	return &core{
 		client:       c.client,
 		cfg:          c.cfg,
-		flushTimeout: c.flushTimeout,
 		fields:       m,
 		LevelEnabler: c.LevelEnabler,
 	}
