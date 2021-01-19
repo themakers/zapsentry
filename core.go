@@ -1,7 +1,6 @@
 package zapsentry
 
 import (
-	"encoding/json"
 	"errors"
 	"time"
 
@@ -66,11 +65,6 @@ func (c *core) Write(ent zapcore.Entry, fs []zapcore.Field) error {
 	if !c.cfg.DisableStacktrace {
 		trace := sentry.NewStacktrace()
 		trace.Frames = trace.Frames[:len(trace.Frames)-(3+c.cfg.Skip)]
-		if data, err := json.MarshalIndent(trace, "", "  "); err != nil {
-			panic(err)
-		} else {
-			println(string(data))
-		}
 		if trace != nil {
 			event.Exception = []sentry.Exception{{
 				Type:       ent.Message,
