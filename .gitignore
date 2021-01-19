@@ -16,5 +16,6 @@ glide.lock
 
 # IDE files
 .idea/
+*.iml
 
 vendor
